@@ -13,13 +13,12 @@ app = FastAPI(title="Image Denoiser API")
 
 @app.get("/api/ping", response_class=PlainTextResponse)
 async def ping() -> PlainTextResponse:
-    # htmx will insert this directly into the #status element
     return PlainTextResponse("Server responded successfully")
 
 
 @app.post("/api/upload", response_class=PlainTextResponse)
 async def upload_image(file: UploadFile = File(...)) -> PlainTextResponse:
-    # Placeholder: in a real application we would process the uploaded image.
+    # do image logic here
     msg = f"Image '{file.filename}' received successfully"
     return PlainTextResponse(msg)
 
