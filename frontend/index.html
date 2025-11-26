@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Image Uploader</title>
+        <link
+            href="https://cdn.jsdelivr.net/npm/daisyui@4.10.2/dist/full.min.css"
+            rel="stylesheet"
+            type="text/css"
+        >
+
+        <!-- Layout tweaks -->
+        <style>
+            body {
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: #f3f4f6; /* light gray background */
+            }
+            .card {
+                width: 100%;
+                max-width: 480px; /* keep it from being super wide */
+                margin: 0 1rem; /* small side padding on tiny screens */
+            }
+            /* Simple loading indicator behavior for htmx */
+            .htmx-indicator {
+                display: none;
+            }
+            .htmx-request .htmx-indicator {
+                display: inline;
+            }
+        </style>
+
+        <!-- htmx -->
+        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    </head>
+    <body>
+        <div class="card shadow-2xl bg-base-100">
+            <div class="card-body space-y-4">
+                <h1 class="card-title justify-center">FastAPI Upload</h1>
+
+                <p id="status" class="text-center text-sm text-base-content/70">
+                    Click ping or upload an image.
+                </p>
+                <p
+                    class="text-center text-xs text-base-content/60 htmx-indicator"
+                >
+                    Working...
+                </p>
+
+                <!-- Ping server button using htmx -->
+                <div class="flex gap-3 justify-center">
+                    <button
+                        class="btn btn-primary"
+                        type="button"
+                        hx-get="/api/ping"
+                        hx-target="#status"
+                        hx-swap="innerHTML"
+                    >
+                        Ping server
+                    </button>
+                </div>
+
+                <!-- Upload form using htmx -->
+                <form
+                    class="form-control gap-3"
+                    hx-post="/api/upload"
+                    hx-target="#status"
+                    hx-swap="innerHTML"
+                    enctype="multipart/form-data"
+                >
+                    <input
+                        id="file-input"
+                        name="file"
+                        type="file"
+                        accept="image/*"
+                        class="file-input file-input-bordered w-full"
+                        required
+                    >
+                    <button type="submit" class="btn btn-secondary w-full">
+                        Upload image
+                    </button>
+                </form>
+            </div>
+        </div>
+    </body>
+</html>
