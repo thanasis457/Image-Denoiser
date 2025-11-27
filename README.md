@@ -1,6 +1,6 @@
 How to run:
 
-Go to backend folder and activate .venv
+Activate .venv
 
 Run main.py
 
