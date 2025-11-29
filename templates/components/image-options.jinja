@@ -1,0 +1,25 @@
+{% set has_options = image_options and image_options | length > 0 %}
+<div id="image-options" class="flex flex-col gap-2 w-full">
+    <h2 class="text-sm font-semibold text-base-content/70">Image options</h2>
+
+    {% if has_options %}
+        <div class="flex flex-wrap gap-2">
+            {% for option in image_options %}
+                <button
+                    class="btn btn-outline btn-sm image-option"
+                    data-action-type="{{ option.type | default('process', true) }}"
+                    {% if option.endpoint %}
+                        data-endpoint="{{ option.endpoint }}"
+                    {% endif %}
+                    data-method="{{ option.method | default('post', true) }}"
+                >
+                    {{ option.label }}
+                </button>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-xs text-base-content/60">
+            No image actions are available.
+        </p>
+    {% endif %}
+</div>

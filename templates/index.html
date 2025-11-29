@@ -9,35 +9,7 @@
             rel="stylesheet"
             type="text/css"
         >
-
-        <!-- Layout tweaks -->
-        <style>
-            body {
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background-color: #f3f4f6; /* light gray background */
-            }
-            .card {
-                width: 100%;
-                max-width: 480px; /* keep it from being super wide */
-                margin: 0 1rem; /* small side padding on tiny screens */
-            }
-            /* Simple loading indicator behavior for htmx */
-            .htmx-indicator {
-                display: none;
-            }
-            .htmx-request .htmx-indicator {
-                display: inline;
-            }
-            #preview-image {
-                max-width: 100%;
-                max-height: 240px;
-                border-radius: 0.5rem;
-                object-fit: contain;
-            }
-        </style>
+        <link rel="stylesheet" href="/static/styles.css">
 
         <!-- htmx -->
         <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -45,16 +17,33 @@
     <body>
         <div class="card shadow-2xl bg-base-100">
             <div class="card-body space-y-4">
-                <h1 class="card-title justify-center">FastAPI Upload</h1>
+                <h1 class="card-title justify-center">Image Denoiser</h1>
 
                 <p id="status" class="text-center text-sm text-base-content/70">
-                    Click ping or upload an image.
+                    Select an image
                 </p>
                 <p
                     class="text-center text-xs text-base-content/60 htmx-indicator"
                 >
                     Working...
                 </p>
+
+                <div
+                    id="image-section"
+                    class="flex flex-col md:flex-row gap-4 justify-center items-center"
+                >
+                    <div id="image-container" class="flex justify-center">
+                        <img
+                            id="main-image"
+                            alt="Selected image preview"
+                            style="display: none"
+                            class="max-h-80 rounded-lg"
+                        >
+                    </div>
+                    <div class="w-full md:w-auto">
+                        {% include "components/image-options.jinja" %}
+                    </div>
+                </div>
 
                 <!-- Ping server button using htmx -->
                 <div class="flex gap-3 justify-center">
@@ -69,15 +58,27 @@
                     </button>
                 </div>
 
+                <div class="flex gap-3 justify-center">
+                    <div
+                        id="dropdown-wrapper"
+                        class="w-full"
+                        hx-get="/get-image-dropdown"
+                        hx-trigger="load"
+                        hx-swap="outerHTML"
+                        hx-indicator=".htmx-indicator"
+                    >
+                        {% include "components/dropdown.jinja" %}
+                    </div>
+                </div>
+
                 <!-- Upload form using htmx -->
-                <form
+                <!-- <form
                     class="form-control gap-3"
                     hx-post="/api/upload"
                     hx-target="#status"
                     hx-swap="innerHTML"
                     enctype="multipart/form-data"
                 >
-                    <!-- Image preview goes here -->
                     <div id="preview-container" class="flex justify-center">
                         <img
                             id="preview-image"
@@ -97,30 +98,132 @@
                     <button type="submit" class="btn btn-secondary w-full">
                         Upload image
                     </button>
-                </form>
+                </form> -->
             </div>
         </div>
 
         <script>
-            const fileInput = document.getElementById(
-                "file-input",
-            );
-            const previewImage = document.getElementById(
-                "preview-image",
-            );
+            const statusEl = document.getElementById("status");
+            const mainImage = document.getElementById("main-image");
+            const defaultImagePath = {{ default_image | default('', true) | tojson }};
 
-            fileInput.addEventListener("change", (event) => {
-                const [file] = event.target.files || [];
-                if (!file) {
-                    previewImage.style.display = "none";
-                    previewImage.removeAttribute("src");
+            const toImageUrl = (path) =>
+                path ? `/select-image?img=${encodeURIComponent(path)}` : "/select-image";
+
+            const imageState = {
+                currentPath: defaultImagePath,
+                currentBlob: null,
+                objectUrl: null,
+            };
+
+            const updateStatus = (text) => {
+                if (statusEl && text) {
+                    statusEl.textContent = text;
+                }
+            };
+
+            const setMainImageSrc = (src) => {
+                if (!mainImage || !src) {
+                    return;
+                }
+                if (imageState.objectUrl) {
+                    URL.revokeObjectURL(imageState.objectUrl);
+                    imageState.objectUrl = null;
+                }
+                mainImage.src = src;
+                mainImage.style.display = "block";
+                if (src.startsWith("blob:")) {
+                    imageState.objectUrl = src;
+                }
+            };
+
+            const loadImageFromPath = (path, label) => {
+                imageState.currentPath = path || defaultImagePath;
+                imageState.currentBlob = null;
+                setMainImageSrc(toImageUrl(imageState.currentPath));
+                updateStatus(label || "Image loaded");
+            };
+
+            const resetImage = () => {
+                imageState.currentBlob = null;
+                setMainImageSrc(toImageUrl(imageState.currentPath));
+                updateStatus("Image reset");
+            };
+
+            const getCurrentImageBlob = async () => {
+                if (imageState.currentBlob) {
+                    return imageState.currentBlob;
+                }
+
+                const response = await fetch(toImageUrl(imageState.currentPath));
+                if (!response.ok) {
+                    throw new Error("Failed to fetch source image");
+                }
+
+                return await response.blob();
+            };
+
+            const processImageAction = async (button) => {
+                const endpoint = button.dataset.endpoint;
+                if (!endpoint) return;
+
+                const method = (button.dataset.method || "post").toUpperCase();
+                const actionLabel = button.textContent.trim() || "Action";
+                updateStatus(`Running ${actionLabel}...`);
+                button.disabled = true;
+
+                try {
+                    const blob = await getCurrentImageBlob();
+                    const formData = new FormData();
+                    const filename =
+                        imageState.currentPath.split("/").pop() || "selected-image.png";
+                    formData.append("file", blob, filename);
+
+                    const response = await fetch(endpoint, {
+                        method,
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Request failed");
+                    }
+
+                    const resultBlob = await response.blob();
+                    imageState.currentBlob = resultBlob;
+                    const objectUrl = URL.createObjectURL(resultBlob);
+                    setMainImageSrc(objectUrl);
+                    updateStatus(`${actionLabel} complete`);
+                } catch (error) {
+                    console.error(error);
+                    updateStatus(error.message || "Something went wrong");
+                } finally {
+                    button.disabled = false;
+                }
+            };
+
+            document.body.addEventListener("change", (event) => {
+                if (event.target.id !== "image-select") return;
+                const option = event.target.selectedOptions[0];
+                const value = option?.value || "";
+                const label = option?.textContent?.trim() || "Image loaded";
+                loadImageFromPath(value || defaultImagePath, label);
+            });
+
+            document.body.addEventListener("click", (event) => {
+                const button = event.target.closest(".image-option");
+                if (!button) return;
+                event.preventDefault();
+
+                const actionType = button.dataset.actionType || "process";
+                if (actionType === "reset") {
+                    resetImage();
                     return;
                 }
 
-                const url = URL.createObjectURL(file);
-                previewImage.src = url;
-                previewImage.style.display = "block";
+                processImageAction(button);
             });
+
+            loadImageFromPath(defaultImagePath, "Loaded default image");
         </script>
     </body>
 </html>
